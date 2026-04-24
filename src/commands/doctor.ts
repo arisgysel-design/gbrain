@@ -9,7 +9,8 @@ import { compareVersions } from './migrations/index.ts';
 import { createProgress, startHeartbeat, type ProgressReporter } from '../core/progress.ts';
 import { getCliOptions, cliOptsToProgressOptions } from '../core/cli-options.ts';
 import type { DbUrlSource } from '../core/config.ts';
-import { join } from 'path';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 
 export interface Check {
@@ -59,7 +60,8 @@ export async function runDoctor(engine: BrainEngine | null, args: string[], dbSo
   // --- Filesystem checks (always run, no DB needed) ---
 
   // 1. Resolver health
-  const repoRoot = findRepoRoot();
+  const moduleRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const repoRoot = findRepoRoot() ?? findRepoRoot(moduleRoot);
   if (repoRoot) {
     const skillsDir = join(repoRoot, 'skills');
 
