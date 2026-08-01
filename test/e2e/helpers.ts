@@ -13,6 +13,7 @@ import { PostgresEngine } from '../../src/core/postgres-engine.ts';
 import * as db from '../../src/core/db.ts';
 import { importFromContent } from '../../src/core/import-file.ts';
 import { parseMarkdown } from '../../src/core/markdown.ts';
+import { assertSafeTestDatabaseUrl } from '../helpers/assert-safe-test-database.ts';
 
 // Load .env.testing if present
 const envPath = resolve(import.meta.dir, '../../.env.testing');
@@ -81,23 +82,7 @@ export function assertSafeE2eDatabaseUrl(
   url: string,
   env: Record<string, string | undefined> = process.env,
 ): void {
-  let dbName: string;
-  try {
-    dbName = decodeURIComponent(new URL(url).pathname.replace(/^\//, ''));
-  } catch {
-    throw new Error(`E2E guard: DATABASE_URL is not a parseable URL; refusing to run destructive setup.`);
-  }
-  if (!dbName) {
-    throw new Error(`E2E guard: DATABASE_URL has no database name; refusing to run destructive setup.`);
-  }
-  if (/(^|[_-])test([_-]|$)/i.test(dbName)) return;
-  if (env.GBRAIN_E2E_ALLOW_DB && env.GBRAIN_E2E_ALLOW_DB === dbName) return;
-  throw new Error(
-    `E2E guard: database "${dbName}" does not look like a test database ` +
-    `(expected "test" as a name segment, e.g. gbrain_test). setupDB() would ` +
-    `TRUNCATE every data table in it. If this is intentional, set ` +
-    `GBRAIN_E2E_ALLOW_DB=${dbName} to opt in explicitly.`,
-  );
+  assertSafeTestDatabaseUrl(url, env);
 }
 
 /**

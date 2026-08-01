@@ -14,8 +14,12 @@ timeout = 60_000
 # tests that want the new default call configureGateway() explicitly in
 # their own beforeAll.
 #
+# Production DB guard: refuse every `bun test` invocation before any suite can
+# connect when DATABASE_URL or either GBRAIN database URL targets a non-test DB.
+# This covers legacy suites that bypass test/e2e/helpers.ts.
+#
 # #2823: redirect GBRAIN_AUDIT_DIR to a per-run scratch dir BEFORE any test
 # runs, so audit-emitting code paths (content-sanity, shell-audit, etc.)
 # can't leak fixture events into the operator's real ~/.gbrain/audit/. See
 # test/helpers/audit-dir-preload.ts for the full rationale.
-preload = ["./test/helpers/legacy-embedding-preload.ts", "./test/helpers/audit-dir-preload.ts"]
+preload = ["./test/helpers/database-guard-preload.ts", "./test/helpers/legacy-embedding-preload.ts", "./test/helpers/audit-dir-preload.ts"]

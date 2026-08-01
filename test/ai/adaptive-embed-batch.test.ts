@@ -227,6 +227,10 @@ describe('isTokenLimitError (pure helper)', () => {
     expect(isTokenLimitError(new Error('Batch contains too many tokens'))).toBe(true);
   });
 
+  test('matches Ollama context-length error', () => {
+    expect(isTokenLimitError(new Error('the input length exceeds the context length'))).toBe(true);
+  });
+
   test('matches OpenAI embeddings "maximum request size" error (regression: PR ###)', () => {
     // Real error string returned by OpenAI's /v1/embeddings endpoint when the
     // sum of all input items exceeds 300k tokens. Without this match, gbrain's

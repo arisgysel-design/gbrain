@@ -1848,6 +1848,8 @@ export function isTokenLimitError(err: unknown): boolean {
     /max.*allowed.*tokens.*batch/i.test(msg) ||
     /batch.*too.*many.*tokens/i.test(msg) ||
     /token.*limit.*exceeded/i.test(msg) ||
+    // Ollama / nomic-embed-text when a request exceeds the model context.
+    /input length exceeds.*context length/i.test(msg) ||
     // OpenAI embeddings: "Invalid 'input': maximum request size is 300000 tokens per request."
     /maximum request size.*tokens/i.test(msg) ||
     /max.*tokens.*per.*request/i.test(msg)

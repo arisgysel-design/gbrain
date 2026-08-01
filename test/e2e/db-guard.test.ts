@@ -4,7 +4,9 @@
  */
 
 import { describe, test, expect } from 'bun:test';
-import { assertSafeE2eDatabaseUrl } from './helpers.ts';
+import { assertSafeTestDatabaseUrl } from '../helpers/assert-safe-test-database.ts';
+
+const assertSafeE2eDatabaseUrl = assertSafeTestDatabaseUrl;
 
 const NO_ENV = {} as Record<string, string | undefined>;
 
@@ -57,7 +59,7 @@ describe('assertSafeE2eDatabaseUrl', () => {
   });
 
   test('refuses unparseable URLs and missing database names', () => {
-    expect(() => assertSafeE2eDatabaseUrl('not a url', NO_ENV)).toThrow(/not a parseable URL/);
+    expect(() => assertSafeE2eDatabaseUrl('not a url', NO_ENV)).toThrow(/not parseable/);
     expect(() => assertSafeE2eDatabaseUrl('postgresql://u:p@localhost:5432/', NO_ENV)).toThrow(
       /no database name/,
     );
