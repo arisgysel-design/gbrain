@@ -7,6 +7,7 @@ import { join } from 'path';
 import { existsSync } from 'fs';
 import { execFileSync } from 'child_process';
 import type { BrainEngine } from '../../core/engine.ts';
+import type { EnvProbeSignals } from '../../core/execution-env.ts';
 import { LATEST_VERSION } from '../../core/migrate.ts';
 // Agent-bootstrap doctor group (plan B2/B4/ENG-4 + one-live-serve note).
 import { readHarnessReceiptState, readReceipt } from '../../core/bootstrap/format.ts';
@@ -24,7 +25,7 @@ import type { Check } from '../doctor.ts';
  * `gbrain bootstrap` get ZERO checks from this group. Every probe is
  * fail-soft: a broken telemetry file degrades to a warn, never a throw.
  */
-export async function bootstrapDoctorChecks(engine: BrainEngine | null): Promise<Check[]> {
+export async function bootstrapDoctorChecks(engine: BrainEngine | null, envSignals: EnvProbeSignals = {}): Promise<Check[]> {
   const checks: Check[] = [];
   let home: string;
   try {
@@ -372,7 +373,7 @@ export async function bootstrapDoctorChecks(engine: BrainEngine | null): Promise
   try {
     if (ws !== null && receipt !== null) {
       const { detectExecutionEnvironment } = await import('../../core/execution-env.ts');
-      const envKind = detectExecutionEnvironment();
+      const envKind = detectExecutionEnvironment(envSignals);
       if (envKind !== 'local') {
         // Answered BEFORE the subprocess probes — cloud/container doctor
         // runs must not pay launchctl/crontab spawns for an answer that is

@@ -714,7 +714,7 @@ describe('bootstrap_durability_job [B7/D7]', () => {
     tmpDirs.push(fakeHome);
     const checks = await withEnv(
       { ...NEUTRAL_ENV, GBRAIN_HOME: parent, HOME: fakeHome },
-      () => bootstrapDoctorChecks(null),
+      () => bootstrapDoctorChecks(null, { env: {}, fileExists: () => false }),
     );
     const c = byName(checks, 'bootstrap_durability_job');
     expect(c?.status).toBe('warn');
