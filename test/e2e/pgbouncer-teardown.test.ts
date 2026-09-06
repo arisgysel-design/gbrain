@@ -54,9 +54,15 @@ async function runCli(
   timeoutMs: number,
 ): Promise<{ exitCode: number; stdout: string; stderr: string; wallMs: number }> {
   const t0 = Date.now();
+  // The E2E runner's direct shard URL must not override this fixture's
+  // pooled config. Otherwise `get` queries gbrain_test, not gbrain_pgbouncer.
+  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env, GBRAIN_SKIP_STARTUP_HOOKS: '1' };
+  delete childEnv.DATABASE_URL;
+  delete childEnv.GBRAIN_DATABASE_URL;
+  delete childEnv.GBRAIN_DIRECT_DATABASE_URL;
   const proc = Bun.spawn(['bun', 'run', join(REPO, 'src', 'cli.ts'), ...args], {
     cwd: REPO,
-    env: { ...process.env, ...env, GBRAIN_SKIP_STARTUP_HOOKS: '1' },
+    env: childEnv,
     stdout: 'pipe',
     stderr: 'pipe',
   });
