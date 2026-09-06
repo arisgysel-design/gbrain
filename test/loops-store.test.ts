@@ -77,11 +77,14 @@ describe('upsertOpenLoop', () => {
   });
 
   test('reopen: a closed loop flips back to open (closed_at/closed_by cleared) on conflict', async () => {
-    const { id } = await upsertOpenLoop(engine, loop());
+    const { id } = await upsertOpenLoop(engine, loop({ lastActivityAt: '2026-08-20T00:00:00.000Z' }));
     const closed = await closeOpenLoop(engine, 'g1', id, 'done', 'manual');
     expect(closed?.status).toBe('done');
 
-    const again = await upsertOpenLoop(engine, loop({ summary: 'they pinged again' }));
+    const again = await upsertOpenLoop(engine, loop({
+      summary: 'they pinged again',
+      lastActivityAt: '2026-08-24T00:00:00.000Z',
+    }));
     expect(again.created).toBe(false);
     expect(again.id).toBe(id);
 
