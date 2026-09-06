@@ -34,6 +34,7 @@ let tokenStatus = 200;
 let mcpResponseFor: (req: { method: string; params?: unknown }) => unknown = () => ({});
 let mcpStatusOverride: number | null = null;
 let mcpStatusOnce: number | null = null;
+let toolStatusOnce: number | null = null;
 let tokenMintCount = 0;
 
 beforeAll(async () => {
@@ -87,6 +88,12 @@ beforeAll(async () => {
           serverInfo: { name: 'mcp-client-test-fixture', version: '1' },
         };
       } else if (body.method === 'tools/call') {
+        if (toolStatusOnce !== null) {
+          res.statusCode = toolStatusOnce;
+          toolStatusOnce = null;
+          res.end(res.statusCode === 401 ? '' : 'upstream error: unauthorized client-401-fixture');
+          return;
+        }
         result = mcpResponseFor({ method: body.method, params: body.params });
       } else {
         result = {};
@@ -114,6 +121,7 @@ beforeEach(() => {
   tokenMintCount = 0;
   mcpStatusOverride = null;
   mcpStatusOnce = null;
+  toolStatusOnce = null;
   mcpResponseFor = () => ({ content: [{ type: 'text', text: JSON.stringify({ ok: true }) }] });
   _clearMcpClientTokenCache();
 });
@@ -159,6 +167,13 @@ describe('callRemoteTool — happy path', () => {
 });
 
 describe('callRemoteTool — 401 refresh-on-once', () => {
+  test('HTTP 401 during tools/call (after initialization) refreshes once', async () => {
+    toolStatusOnce = 401;
+    const result = await callRemoteTool(makeConfig(), 'noop', {});
+    expect(unpackToolResult<{ ok: boolean }>(result)).toEqual({ ok: true });
+    expect(tokenMintCount).toBe(2);
+  });
+
   test('persistent HTTP 401 fails after exactly one refresh', async () => {
     mcpStatusOverride = 401;
     await expect(callRemoteTool(makeConfig(), 'noop', {})).rejects.toMatchObject({
@@ -190,6 +205,12 @@ describe('callRemoteTool — 401 refresh-on-once', () => {
 });
 
 describe('callRemoteTool — error surfaces', () => {
+  test.each([403, 500])('HTTP %i during tools/call does not refresh credentials', async (status) => {
+    toolStatusOnce = status;
+    await expect(callRemoteTool(makeConfig(), 'noop', {})).rejects.toBeInstanceOf(RemoteMcpError);
+    expect(tokenMintCount).toBe(1);
+  });
+
   test.each(['client-401-fixture', 'unauthorized namespace', 'invalid token in document'])('tool error containing %s is not an HTTP auth failure', async (marker) => {
     const message = `put_page: ${marker} is outside bound_slug_prefixes`;
     let calls = 0;
