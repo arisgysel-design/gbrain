@@ -117,6 +117,8 @@ for _e2e_var in $(env | grep -oE '^(CONDUCTOR_|MCP_|OPENCLAW_|HERMES_|GROK_|OPEN
     GBRAIN_HOME) ;;  # required for HOME isolation (set above) — keep
     GBRAIN_PGLITE_SNAPSHOT) ;;  # snapshot fast-path fixture (exported by ci-local.sh / runners) — keep
     GBRAIN_TEST_ALLOW_DATABASE_URL) ;;  # #3485 preload opt-in (set above) — keep
+    GBRAIN_TEST_DB) ;;  # explicit Docker test-host reset opt-in; test-shaped DB floor still applies
+    GBRAIN_PGBOUNCER_URL|GBRAIN_PGBOUNCER_DIRECT_URL) ;;  # isolated CI pooler targets
     GBRAIN_TEST_KEEP_PROVIDER_KEYS) ;;  # provider-keys preload opt-in (set above) — keep
     GBRAIN_E2E_FILE_TIMEOUT) ;;  # per-file cap override — read AFTER this scrub, so it must survive it
     GBRAIN_E2E_ALLOW_DB) ;;  # #3485 name-floor opt-in — the guard's own error

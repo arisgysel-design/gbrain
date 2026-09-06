@@ -153,6 +153,23 @@ describe('operator-env-preload (#4023)', () => {
     expect(r.report.GBRAIN_SOURCE).toBe('default');
   }, 30_000);
 
+  for (const optedIn of [false, true]) {
+    test(`pooler URLs survive only an opted-in database test lane: ${optedIn}`, () => {
+      const urls = {
+        GBRAIN_PGBOUNCER_URL: 'postgresql://localhost:6554/gbrain_pgbouncer',
+        GBRAIN_PGBOUNCER_DIRECT_URL: 'postgresql://localhost:5544/gbrain_test',
+      };
+      const r = runProbe(
+        { ...urls, GBRAIN_TEST_ALLOW_DATABASE_URL: optedIn ? '1' : '0' },
+        Object.keys(urls),
+      );
+      expect(r.exitCode).toBe(0);
+      for (const [name, url] of Object.entries(urls)) {
+        expect(r.report[name]).toBe(optedIn ? url : null);
+      }
+    }, 30_000);
+  }
+
   test('GBRAIN_DEBUG_PRELOAD=1 logs removed names, never values', () => {
     const r = runProbe(
       { GBRAIN_SOURCE: 'hunter2-not-for-logs', GBRAIN_DEBUG_PRELOAD: '1' },

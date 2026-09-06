@@ -61,6 +61,13 @@ const KEEP_EXACT = new Set([
 // in-process by test/e2e/install-real-*.serial.test.ts.
 const KEEP_PREFIX = /^GBRAIN_(TEST_|CI_|E2E_|REAL_)/;
 
+// Pooler targets are test infrastructure only after the database lane opted in.
+// Bare unit runs must not inherit ambient pooler connections.
+if (process.env.GBRAIN_TEST_ALLOW_DATABASE_URL === '1') {
+  KEEP_EXACT.add('GBRAIN_PGBOUNCER_URL');
+  KEEP_EXACT.add('GBRAIN_PGBOUNCER_DIRECT_URL');
+}
+
 if (process.env.GBRAIN_TEST_KEEP_AMBIENT_ENV !== '1') {
   const removed: string[] = [];
   for (const name of Object.keys(process.env)) {
