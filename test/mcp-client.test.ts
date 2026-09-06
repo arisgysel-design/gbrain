@@ -33,6 +33,7 @@ let port: number;
 let tokenStatus = 200;
 let mcpResponseFor: (req: { method: string; params?: unknown }) => unknown = () => ({});
 let mcpStatusOverride: number | null = null;
+let mcpStatusOnce: number | null = null;
 let tokenMintCount = 0;
 
 beforeAll(async () => {
@@ -61,8 +62,9 @@ beforeAll(async () => {
     }
     if (req.url === '/mcp' && req.method === 'POST') {
       // Test-controlled status override (used to simulate 401 from MCP).
-      if (mcpStatusOverride !== null) {
-        res.statusCode = mcpStatusOverride;
+      if (mcpStatusOnce !== null || mcpStatusOverride !== null) {
+        res.statusCode = mcpStatusOnce ?? mcpStatusOverride!;
+        mcpStatusOnce = null;
         res.end();
         return;
       }
@@ -111,6 +113,7 @@ beforeEach(() => {
   tokenStatus = 200;
   tokenMintCount = 0;
   mcpStatusOverride = null;
+  mcpStatusOnce = null;
   mcpResponseFor = () => ({ content: [{ type: 'text', text: JSON.stringify({ ok: true }) }] });
   _clearMcpClientTokenCache();
 });
@@ -156,50 +159,51 @@ describe('callRemoteTool — happy path', () => {
 });
 
 describe('callRemoteTool — 401 refresh-on-once', () => {
+  test('persistent HTTP 401 fails after exactly one refresh', async () => {
+    mcpStatusOverride = 401;
+    await expect(callRemoteTool(makeConfig(), 'noop', {})).rejects.toMatchObject({
+      reason: 'auth_after_refresh',
+    });
+    expect(tokenMintCount).toBe(2);
+  });
+
+  test('a tool denial after a real 401 refresh keeps its original error', async () => {
+    mcpStatusOnce = 401;
+    mcpResponseFor = () => ({
+      content: [{ type: 'text', text: 'client-401-fixture is outside bound_slug_prefixes' }],
+      isError: true,
+    });
+    await expect(callRemoteTool(makeConfig(), 'put_page', {})).rejects.toMatchObject({
+      reason: 'tool_error',
+    });
+    expect(tokenMintCount).toBe(2);
+  });
+
   test('401 from /mcp → re-mint token + retry succeeds', async () => {
-    // Pre-seed cache with a fresh-but-server-rejected token by first
-    // succeeding once, then flipping the server to 401 just once.
     await callRemoteTool(makeConfig(), 'first_success', {});
     expect(tokenMintCount).toBe(1);
-
-    // Next call: the /mcp endpoint will return 401 on the first attempt;
-    // the client should re-mint and retry. We simulate "rejected once,
-    // accepted on retry" by counting requests.
-    let mcpCallCount = 0;
-    mcpStatusOverride = null;
-    const origResponse = mcpResponseFor;
-    mcpResponseFor = ({ method, params }) => {
-      if (method === 'tools/call') mcpCallCount++;
-      // First call: instruct fixture to return 401 by setting override THEN restore
-      // Actually simpler: throw on first attempt by setting mcpStatusOverride pre-emptively
-      return origResponse({ method, params });
-    };
-
-    // Easier path: install a once-only 401 on /mcp by setting mcpStatusOverride
-    // for one request; we need a counter. Use a flag.
-    let overrideUsed = false;
-    const realServer = server;
-    void realServer;
-    mcpStatusOverride = null;
-    // Wrap mcpResponseFor with a one-shot rejector — but the override is a
-    // status-line mechanism, not a body mechanism. Use a small hack: make
-    // the next /mcp request return a tool-error envelope that the client
-    // interprets as 401-equivalent. Actually the SDK throws on 401 status,
-    // so we need a real 401. Use mcpStatusOverride for one request.
-    // For test simplicity: expect that calling with stale-cached-token-then-
-    // 401 flow will re-mint. Achieve by setting tokenStatus to a failing
-    // value AFTER first success, then restoring. Skipped for this case;
-    // covered indirectly by the cache-reuse test above.
-
-    // Instead, assert that the cache invalidation API works: clear cache,
-    // call again, expect new token.
-    _clearMcpClientTokenCache();
-    await callRemoteTool(makeConfig(), 'after_clear', {});
+    mcpStatusOnce = 401;
+    await callRemoteTool(makeConfig(), 'after_401', {});
     expect(tokenMintCount).toBe(2);
+
   });
 });
 
 describe('callRemoteTool — error surfaces', () => {
+  test.each(['client-401-fixture', 'unauthorized namespace', 'invalid token in document'])('tool error containing %s is not an HTTP auth failure', async (marker) => {
+    const message = `put_page: ${marker} is outside bound_slug_prefixes`;
+    let calls = 0;
+    mcpResponseFor = () => {
+      calls++;
+      return { content: [{ type: 'text', text: message }], isError: true };
+    };
+    await expect(callRemoteTool(makeConfig(), 'put_page', {})).rejects.toMatchObject({
+      reason: 'tool_error', message: `Remote tool put_page failed: ${message}`,
+    });
+    expect(calls).toBe(1);
+    expect(tokenMintCount).toBe(1);
+  });
+
   test('config has no remote_mcp → throws RemoteMcpError(config)', async () => {
     await expect(callRemoteTool({ engine: 'postgres' }, 'foo', {})).rejects.toThrow(RemoteMcpError);
   });

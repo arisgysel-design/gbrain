@@ -19,7 +19,7 @@
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { GBrainConfig } from './config.ts';
 import { discoverOAuth, mintClientCredentialsToken } from './remote-mcp-probe.ts';
 
@@ -328,12 +328,9 @@ export async function callRemoteTool(
     try {
       return await tryCall(initialToken);
     } catch (e) {
-      // RemoteMcpError already-typed: bubble unless it's a tool_error that
-      // happens to look 401-shaped (e.g. SDK wrapping HTTP 401 in a tool
-      // error). For plain Error, do the 401 sniff.
-      const message = e instanceof Error ? e.message : String(e);
-      const looksLike401 = /401|unauthor|invalid.token/i.test(message);
-      if (!looksLike401) throw e;
+      // Refresh only on an actual HTTP 401. Authenticated tool errors may
+      // contain arbitrary text or client IDs with "401"; preserve them.
+      if (!(e instanceof StreamableHTTPError) || e.code !== 401) throw e;
       // Drop cached token and retry once with a fresh mint.
       tokenCache.delete(remote.mcp_url);
       let freshToken: string;
@@ -352,8 +349,7 @@ export async function callRemoteTool(
       try {
         return await tryCall(freshToken);
       } catch (e2) {
-        const m2 = e2 instanceof Error ? e2.message : String(e2);
-        if (/401|unauthor|invalid.token/i.test(m2)) {
+        if (e2 instanceof StreamableHTTPError && e2.code === 401) {
           throw new RemoteMcpError(
             'auth_after_refresh',
             `Auth failed after token refresh. Verify oauth_client_id and secret are still valid; the host operator may need to re-run \`gbrain auth register-client\`.`,
