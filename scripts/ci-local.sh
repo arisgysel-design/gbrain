@@ -317,11 +317,12 @@ fi
 INNER_CMD=$(cat <<'EOF'
 set -euo pipefail
 echo "[runner] bun version: $(bun --version)"
-# The image omits git and ps; fixtures need git and PID-reuse tests need ps.
-if ! command -v git >/dev/null 2>&1 || ! command -v ps >/dev/null 2>&1; then
-  echo "[runner] Installing git + procps (debian apt)..."
+# Fixtures need git/jq, PID-reuse tests need ps, and the security scanner needs python3.
+if ! command -v git >/dev/null 2>&1 || ! command -v ps >/dev/null 2>&1 \
+  || ! command -v jq >/dev/null 2>&1 || ! command -v python3 >/dev/null 2>&1; then
+  echo "[runner] Installing git + procps + jq + python3 (debian apt)..."
   apt-get update -qq >/dev/null
-  apt-get install -y -qq git ca-certificates procps >/dev/null
+  apt-get install -y -qq git ca-certificates procps jq python3 >/dev/null
 fi
 # Container runs as root (uid 0) against a host-uid bind-mount; mark repo +
 # any worktree gitdir as safe so `git status` etc. don't refuse.
