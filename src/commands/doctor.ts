@@ -3869,18 +3869,24 @@ export async function buildChecks(
   if (engine) {
     progress.heartbeat('image_assets');
     try {
-      const rows = await engine.executeRaw<{ storage_path: string; source_local_path: string | null }>(
-        `SELECT f.storage_path, s.local_path AS source_local_path FROM files f LEFT JOIN sources s ON s.id = COALESCE(f.source_id, 'default') WHERE f.mime_type LIKE 'image/%' LIMIT 1000`
+      const rows = await engine.executeRaw<{ storage_path: string; metadata: unknown; source_local_path: string | null }>(
+        `SELECT f.storage_path, f.metadata, s.local_path AS source_local_path FROM files f LEFT JOIN sources s ON s.id = COALESCE(f.source_id, 'default') WHERE f.mime_type LIKE 'image/%' LIMIT 1000`
       );
       let vanished = 0;
       let foreign = 0;
+      let remote = 0;
       const vanishedPaths: string[] = [];
       const fs = await import('node:fs');
-      const { resolveImageAssetPath } = await import('./doctor-asset-paths.ts');
+      const { resolveImageAssetPath, isRemoteImageAsset } = await import('./doctor-asset-paths.ts');
+      const storageConfig = loadConfig()?.storage;
       // storage_path is repo-relative for sync-ingested assets. Prefer the
       // owning source's root; sync.repo_path is only a legacy fallback.
       const repoRoot = (await engine.getConfig('sync.repo_path')) ?? process.cwd();
       for (const r of rows) {
+        if (isRemoteImageAsset(r.metadata, storageConfig)) {
+          remote++;
+          continue;
+        }
         // #1835: Windows drive paths (D:/…) translate to the WSL automount
         // (/mnt/d/…) under WSL, and are SKIPPED (not "missing") on hosts
         // where they cannot exist (macOS / plain Linux) — never joined onto
@@ -3897,20 +3903,22 @@ export async function buildChecks(
           if (vanishedPaths.length < 5) vanishedPaths.push(r.storage_path);
         }
       }
-      const checked = rows.length - foreign;
+      const checked = rows.length - foreign - remote;
+      const remoteNote = remote > 0
+        ? ` ${remote} remote image(s) not verified by this local check; run \`gbrain files verify\` to check storage.` : '';
       const foreignNote = foreign > 0
         ? ` (${foreign} Windows-drive path(s) skipped — not resolvable on this platform)`
         : '';
       if (rows.length === 0) {
         checks.push({ name: 'image_assets', status: 'ok', message: 'No image assets indexed yet' });
       } else if (vanished === 0) {
-        checks.push({ name: 'image_assets', status: 'ok', message: `${checked} image(s) all present on disk${foreignNote}` });
+        checks.push({ name: 'image_assets', status: remote > 0 ? 'warn' : 'ok', message: `${checked} local image(s) all present on disk${foreignNote}${remoteNote}` });
       } else {
         checks.push({
           name: 'image_assets',
           status: 'warn',
           message: `${vanished} of ${checked} image(s) missing from disk (e.g. ${vanishedPaths.join(', ')})${foreignNote}. ` +
-                   `Fix: restore from git, or \`gbrain sync --skip-failed\` to acknowledge.`,
+                   `Fix: restore from git, or \`gbrain sync --skip-failed\` to acknowledge.${remoteNote}`,
         });
       }
     } catch {

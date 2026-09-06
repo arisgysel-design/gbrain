@@ -1,5 +1,25 @@
 import { describe, expect, test } from 'bun:test';
-import { resolveImageAssetPath } from '../src/commands/doctor-asset-paths.ts';
+import { isRemoteImageAsset, resolveImageAssetPath } from '../src/commands/doctor-asset-paths.ts';
+
+describe('doctor remote image classification', () => {
+  test('explicit cloud lanes never resolve to local paths', () => {
+    for (const storage of ['supabase', 's3', 'r2']) {
+      expect(isRemoteImageAsset({ storage })).toBe(true);
+    }
+  });
+  test('git and local metadata override a remote default', () => {
+    for (const storage of ['git', 'local']) {
+      expect(isRemoteImageAsset({ storage }, { backend: 'supabase' })).toBe(false);
+    }
+  });
+  test('legacy rows use the configured backend', () => {
+    expect(isRemoteImageAsset({}, { backend: 'supabase' })).toBe(true);
+    expect(isRemoteImageAsset(null, { backend: 's3' })).toBe(true);
+    expect(isRemoteImageAsset({}, { backend: 'local' })).toBe(false);
+    expect(isRemoteImageAsset({}, undefined)).toBe(false);
+    expect(isRemoteImageAsset({}, 'invalid')).toBe(false);
+  });
+});
 
 describe('doctor image asset path resolution', () => {
   test('uses the owning source local_path before the global sync fallback', () => {

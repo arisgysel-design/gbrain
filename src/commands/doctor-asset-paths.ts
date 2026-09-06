@@ -38,6 +38,17 @@ export interface AssetPathResolution {
   foreign: boolean;
 }
 
+/** Explicit per-file storage wins over the configured fallback backend. */
+export function isRemoteImageAsset(metadata: unknown, storageConfig?: unknown): boolean {
+  const backend = storageConfig !== null && typeof storageConfig === 'object' && 'backend' in storageConfig
+    ? storageConfig.backend : undefined;
+  const lane = metadata !== null && typeof metadata === 'object' && 'storage' in metadata
+    ? metadata.storage : undefined;
+  if (lane === 'git' || lane === 'local') return false;
+  return lane === 'supabase' || lane === 's3' || lane === 'r2'
+    || (lane === undefined && (backend === 'supabase' || backend === 's3'));
+}
+
 /**
  * Resolve a files.storage_path to a stat-able absolute path.
  * `opts.platform` / `opts.wslMountRoot` exist for tests; production callers

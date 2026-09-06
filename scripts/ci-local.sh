@@ -317,11 +317,11 @@ fi
 INNER_CMD=$(cat <<'EOF'
 set -euo pipefail
 echo "[runner] bun version: $(bun --version)"
-# The oven/bun image omits git; many unit tests use mkdtemp + git init for fixtures.
-if ! command -v git >/dev/null 2>&1; then
-  echo "[runner] Installing git (debian apt)..."
+# The image omits git and ps; fixtures need git and PID-reuse tests need ps.
+if ! command -v git >/dev/null 2>&1 || ! command -v ps >/dev/null 2>&1; then
+  echo "[runner] Installing git + procps (debian apt)..."
   apt-get update -qq >/dev/null
-  apt-get install -y -qq git ca-certificates >/dev/null
+  apt-get install -y -qq git ca-certificates procps >/dev/null
 fi
 # Container runs as root (uid 0) against a host-uid bind-mount; mark repo +
 # any worktree gitdir as safe so `git status` etc. don't refuse.
@@ -358,7 +358,8 @@ if [ -f .git ]; then
 fi
 
 echo "[ci-local] Running checks inside runner container..."
-docker compose -f "$COMPOSE_FILE" run --rm "${EXTRA_MOUNTS[@]}" runner bash -c "$INNER_CMD"
+# Bash 3.2 treats an empty array as unset under nounset; preserve zero argv.
+docker compose -f "$COMPOSE_FILE" run --rm ${EXTRA_MOUNTS[@]+"${EXTRA_MOUNTS[@]}"} runner bash -c "$INNER_CMD"
 
 echo ""
 echo "[ci-local] All checks passed."

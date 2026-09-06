@@ -1,5 +1,7 @@
 # Key files — per-file index (gbrain repo)
 
+- `src/commands/doctor-asset-paths.ts` — image path resolution and storage-lane classification. Explicit git/local metadata keeps filesystem verification even when the configured default is remote; cloud metadata, or a remote default for legacy unmarked rows, prevents filesystem checks on object keys. `image_assets` reports remote objects as unverified and points to backend-aware `gbrain files verify`, never claiming cloud availability from a local stat. Local/source-root and Windows/WSL path checks remain separate.
+
 On-demand reference. CLAUDE.md (the always-loaded orientation file) routes here
 via its Reference map. **Read a file's entry before editing that file.**
 
