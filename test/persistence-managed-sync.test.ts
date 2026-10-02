@@ -408,7 +408,8 @@ test('managed sync preserves extension-bearing slugs and their distinct extensio
       const content = (title: string, body: string) => `---\ntype: note\ntitle: ${title}\n---\n${body}\n`;
       const ordinary = content('Ordinary', 'The ordinary page remains separate.');
       const extended = content('Extended', 'The extension-bearing page keeps its identity.');
-      const repeated = content('Repeated', 'The repeated-extension page is separate too.');
+      // No explicit title: the overlay comparison must use the same filename fallback as import.
+      const repeated = '---\ntype: note\n---\nThe repeated-extension page is separate too.\n';
       const f = await fixture(engine, {
         'notes/example.md': ordinary,
         'notes/example.md.md': extended,
@@ -419,8 +420,9 @@ test('managed sync preserves extension-bearing slugs and their distinct extensio
       const slugs = ['notes/example', 'notes/example.md', 'notes/example.md.md'];
       const before = await Promise.all(slugs.map(slug => engine.getPage(slug, { sourceId: f.id })));
       expect(new Set(before.map(page => page?.id)).size).toBe(3);
-      expect(before.map(page => page?.title)).toEqual(['Ordinary', 'Extended', 'Repeated']);
+      expect(before.map(page => page?.title)).toEqual(['Ordinary', 'Extended', 'Example.Md.Md']);
       expect(before.map(page => page?.source_path)).toEqual(slugs.map(slug => `${slug}.md`));
+      expect(readFileSync(join(f.root, 'notes/example.md.md.md'), 'utf8')).toBe(repeated);
       for (const slug of slugs) expect(readFileSync(join(f.root, `${slug}.md`), 'utf8')).not.toContain('slug:');
       writeFileSync(join(f.root, 'notes/example.md.md'), content('Extended', 'Updated extension-bearing content.'));
       const head = commit(f.root, 'update extension-bearing page');
